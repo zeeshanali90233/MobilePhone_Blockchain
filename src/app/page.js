@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import Web3 from "web3";
 import ABI from "../SmartContracts/MobilePhones.json";
 import { ToastContainer, toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 export default function Home() {
   const [currentAccount, setCurrentAccount] = useState(null);
@@ -24,6 +25,7 @@ export default function Home() {
       owner: "",
     },
   });
+  const [txModal, setTxModal] = useState({ isVisible: false, txHash: "" });
 
   useEffect(() => {
     // To Detect Metamask
@@ -61,6 +63,40 @@ export default function Home() {
     setFetchPhoneDetail((prev) => ({ ...prev, imei: e.target.value }));
   };
 
+  const showErrorToast = (message) => {
+    toast.error(message, {
+      position: "top-right",
+      autoClose: 5000,
+      hideProgressBar: true,
+      closeOnClick: true,
+      pauseOnHover: true,
+      draggable: true,
+      progress: undefined,
+      theme: "light",
+      transition: "Bounce",
+    });
+  };
+
+  const showSuccessToast = (message) => {
+    toast.success(message, {
+      position: "top-right",
+      autoClose: 5000,
+      hideProgressBar: true,
+      closeOnClick: true,
+      pauseOnHover: true,
+      draggable: true,
+      progress: undefined,
+      theme: "light",
+      transition: "Bounce",
+    });
+  };
+
+  const showModal = (hash) => {
+    setTxModal({ isVisible: true, txHash: hash });
+  };
+  const closeModal = () => {
+    setTxModal({ isVisible: false, txHash: "" });
+  };
   const connectWallet = async () => {
     try {
       setSpinner((prev) => ({
@@ -94,10 +130,21 @@ export default function Home() {
 
   const AddPhone = async (e) => {
     e.preventDefault();
+    const numberRegex = /^\d+$/;
+
+    if (
+      !numberRegex.test(addPhoneForm.imei1) ||
+      !numberRegex.test(addPhoneForm.imei2)
+    ) {
+      showErrorToast("IMEI Can only be numeric");
+      return;
+    }
+
     setSpinner((prev) => ({
       ...prev,
       isAdding: true,
     }));
+
     try {
       const { ethereum } = window || {};
       if (!ethereum) {
@@ -106,33 +153,25 @@ export default function Home() {
       }
 
       const web3 = new Web3(ethereum);
-      const contractAddress = "0x5570458bDB929FF5f9ba77f1BfAE31f7828b296c";
-      const contract = new web3.eth.Contract(ABI.abi, contractAddress);
-
-      await contract.methods
+      const contract = new web3.eth.Contract(
+        ABI.abi,
+        process.env.NEXT_PUBLIC_CONTRACT_ADDRESS
+      );
+      const txHash = await contract.methods
         .addPhone(
           addPhoneForm.modelNumber,
-          addPhoneForm.imei1,
-          addPhoneForm.imei2
+          Number(addPhoneForm.imei1),
+          Number(addPhoneForm.imei2)
         )
-        .send({ from: "0xFBc6c822ad9602e5e75Ac382F86072FbA12caC34" });
+        .send({ from: currentAccount });
+      showModal(txHash.transactionHash);
 
       setAddPhoneForm({
         imei1: "",
         imei2: "",
         modelNumber: "",
       });
-      toast.success("Succeffully Added", {
-        position: "top-right",
-        autoClose: 5000,
-        hideProgressBar: true,
-        closeOnClick: true,
-        pauseOnHover: true,
-        draggable: true,
-        progress: undefined,
-        theme: "light",
-        transition: Bounce,
-      });
+      showSuccessToast("Transaction Successfull");
       setSpinner((prev) => ({
         ...prev,
         isAdding: false,
@@ -163,12 +202,14 @@ export default function Home() {
       }
 
       const web3 = new Web3(ethereum);
-      const contractAddress = "0x5570458bDB929FF5f9ba77f1BfAE31f7828b296c";
-      const contract = new web3.eth.Contract(ABI.abi, contractAddress);
+      const contract = new web3.eth.Contract(
+        ABI.abi,
+        process.env.NEXT_PUBLIC_CONTRACT_ADDRESS
+      );
 
       const mobileDetail = await contract.methods
         .getPhoneDetails(fetchPhoneDetail.imei)
-        .call({ from: "0xFBc6c822ad9602e5e75Ac382F86072FbA12caC34" });
+        .call({ from: currentAccount });
 
       setFetchPhoneDetail({
         imei: "",
@@ -194,7 +235,6 @@ export default function Home() {
     }
   };
 
-  // 8465130846510
   return (
     <main className="flex min-h-screen justify-center p-5">
       {/* React Toastify */}
@@ -209,8 +249,75 @@ export default function Home() {
         draggable
         pauseOnHover
         theme="light"
-        transition={"Bounce"}
       />
+
+      {txModal.isVisible && (
+        <div className="absolute  z-50 flex bg-black bg-opacity-35 justify-center items-center w-full md:inset-0 h-[calc(100%-1rem)] max-h-full">
+          <div className="relative   p-4 w-full max-w-2xl max-h-full">
+            {/* Modal content */}
+            <div className="relative  w-full bg-white rounded-lg shadow dark:bg-gray-700">
+              {/* Modal header */}
+              <div className="flex items-center justify-between p-4 md:p-5 border-b rounded-t dark:border-gray-600">
+                <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
+                  Transaction Details
+                </h3>
+                <button
+                  onClick={closeModal}
+                  type="button"
+                  className="text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm w-8 h-8 ms-auto inline-flex justify-center items-center dark:hover:bg-gray-600 dark:hover:text-white"
+                >
+                  <svg
+                    className="w-3 h-3"
+                    aria-hidden="true"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 14 14"
+                  >
+                    <path
+                      stroke="currentColor"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="m1 1 6 6m0 0 6 6M7 7l6-6M7 7l-6 6"
+                    />
+                  </svg>
+                  <span className="sr-only">Close modal</span>
+                </button>
+              </div>
+              {/* Modal body */}
+              <div className="p-4 md:p-5 space-y-4">
+                <p className="text-base leading-relaxed text-gray-500 dark:text-gray-400">
+                  Transaction has been{" "}
+                  <span className="text-green-500">Success</span>
+                </p>
+
+                <p className="text-base leading-relaxed text-gray-500 dark:text-gray-400">
+                  Block has been mined at : {txModal.txHash}
+                </p>
+                <p className="text-base leading-relaxed text-gray-500 dark:text-gray-400">
+                  Go and verify it on :{" "}
+                  <a
+                    className="underline text-blue-500"
+                    href="https://sepolia.etherscan.io/"
+                  >
+                    sepolia.etherscan.io
+                  </a>
+                </p>
+              </div>
+              {/* Modal footer */}
+              <div className="flex items-center justify-end p-4 md:p-5 border-t border-gray-200 rounded-b dark:border-gray-600">
+                <button
+                  onClick={closeModal}
+                  type="button"
+                  className="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
+                >
+                  Ok
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="flex flex-col items-center">
         {currentAccount && (
@@ -260,7 +367,7 @@ export default function Home() {
             <p className="block mt-1 font-sans text-base antialiased font-normal leading-relaxed text-gray-700">
               Nice to meet you! Enter mobile imei1 to get.
             </p>
-            <form onSubmit={GetPhone} className=" mt-8 mb-2 w-80 sm:w-96">
+            <form onSubmit={GetPhone} className=" mt-8 mb-2  sm:w-96">
               <div className="flex flex-col gap-6 mb-1">
                 <h6 className="block -mb-3 font-sans text-base antialiased font-semibold leading-relaxed tracking-normal text-blue-gray-900">
                   IMEI
@@ -313,7 +420,7 @@ export default function Home() {
                   Model Number: {fetchPhoneDetail.data.modelNumber}
                 </h4>
                 <h4 className="block font-sans  antialiased font-semibold leading-snug tracking-normal text-blue-gray-900">
-                  IMEI2: {fetchPhoneDetail.data.imei2}
+                  IMEI2: {String(fetchPhoneDetail.data.imei2)}
                 </h4>
                 <h4 className="block font-sans  antialiased font-semibold leading-snug tracking-normal text-blue-gray-900">
                   Owner:{" "}
@@ -334,7 +441,7 @@ export default function Home() {
             <p className="block mt-1 font-sans text-base antialiased font-normal leading-relaxed text-gray-700">
               Nice to meet you! Enter mobile details to register.
             </p>
-            <form onSubmit={AddPhone} className=" mt-8 mb-2 w-80 sm:w-96">
+            <form onSubmit={AddPhone} className=" mt-8 mb-2  sm:w-96">
               <div className="flex flex-col gap-6 mb-1">
                 <h6 className="block -mb-3 font-sans text-base antialiased font-semibold leading-relaxed tracking-normal text-blue-gray-900">
                   Model Number
@@ -345,6 +452,7 @@ export default function Home() {
                     name="modelNumber"
                     className="peer h-full w-full rounded-md border border-blue-gray-200 border-t-transparent !border-t-blue-gray-200 bg-transparent px-3 py-3 font-sans text-sm font-normal text-blue-gray-700 outline outline-0 transition-all placeholder-shown:border placeholder-shown:border-blue-gray-200 placeholder-shown:border-t-blue-gray-200 focus:border-2 focus:border-gray-900 focus:border-t-transparent focus:!border-t-gray-900 focus:outline-0 disabled:border-0 disabled:bg-blue-gray-50"
                     onChange={handleAddPhoneChange}
+                    maxLength={20}
                     value={addPhoneForm.modelNumber}
                   />
                   <label className="before:content[' '] after:content[' '] pointer-events-none absolute left-0 -top-1.5 flex h-full w-full select-none !overflow-visible truncate text-[11px] font-normal leading-tight text-gray-500 transition-all before:pointer-events-none before:mt-[6.5px] before:mr-1 before:box-border before:block before:h-1.5 before:w-2.5 before:rounded-tl-md before:border-t before:border-l before:border-blue-gray-200 before:transition-all before:content-none after:pointer-events-none after:mt-[6.5px] after:ml-1 after:box-border after:block after:h-1.5 after:w-2.5 after:flex-grow after:rounded-tr-md after:border-t after:border-r after:border-blue-gray-200 after:transition-all after:content-none peer-placeholder-shown:text-sm peer-placeholder-shown:leading-[4.1] peer-placeholder-shown:text-blue-gray-500 peer-placeholder-shown:before:border-transparent peer-placeholder-shown:after:border-transparent peer-focus:text-[11px] peer-focus:leading-tight peer-focus:text-gray-900 peer-focus:before:border-t-2 peer-focus:before:border-l-2 peer-focus:before:!border-gray-900 peer-focus:after:border-t-2 peer-focus:after:border-r-2 peer-focus:after:!border-gray-900 peer-disabled:text-transparent peer-disabled:before:border-transparent peer-disabled:after:border-transparent peer-disabled:peer-placeholder-shown:text-blue-gray-500"></label>
@@ -359,6 +467,8 @@ export default function Home() {
                     className="peer h-full w-full rounded-md border border-blue-gray-200 border-t-transparent !border-t-blue-gray-200 bg-transparent px-3 py-3 font-sans text-sm font-normal text-blue-gray-700 outline outline-0 transition-all placeholder-shown:border placeholder-shown:border-blue-gray-200 placeholder-shown:border-t-blue-gray-200 focus:border-2 focus:border-gray-900 focus:border-t-transparent focus:!border-t-gray-900 focus:outline-0 disabled:border-0 disabled:bg-blue-gray-50"
                     name={"imei1"}
                     onChange={handleAddPhoneChange}
+                    maxLength={14}
+                    minLength={14}
                     value={addPhoneForm.imei1}
                   />
                   <label className="before:content[' '] after:content[' '] pointer-events-none absolute left-0 -top-1.5 flex h-full w-full select-none !overflow-visible truncate text-[11px] font-normal leading-tight text-gray-500 transition-all before:pointer-events-none before:mt-[6.5px] before:mr-1 before:box-border before:block before:h-1.5 before:w-2.5 before:rounded-tl-md before:border-t before:border-l before:border-blue-gray-200 before:transition-all before:content-none after:pointer-events-none after:mt-[6.5px] after:ml-1 after:box-border after:block after:h-1.5 after:w-2.5 after:flex-grow after:rounded-tr-md after:border-t after:border-r after:border-blue-gray-200 after:transition-all after:content-none peer-placeholder-shown:text-sm peer-placeholder-shown:leading-[4.1] peer-placeholder-shown:text-blue-gray-500 peer-placeholder-shown:before:border-transparent peer-placeholder-shown:after:border-transparent peer-focus:text-[11px] peer-focus:leading-tight peer-focus:text-gray-900 peer-focus:before:border-t-2 peer-focus:before:border-l-2 peer-focus:before:!border-gray-900 peer-focus:after:border-t-2 peer-focus:after:border-r-2 peer-focus:after:!border-gray-900 peer-disabled:text-transparent peer-disabled:before:border-transparent peer-disabled:after:border-transparent peer-disabled:peer-placeholder-shown:text-blue-gray-500"></label>
@@ -373,6 +483,8 @@ export default function Home() {
                     className="peer h-full w-full rounded-md border border-blue-gray-200 border-t-transparent !border-t-blue-gray-200 bg-transparent px-3 py-3 font-sans text-sm font-normal text-blue-gray-700 outline outline-0 transition-all placeholder-shown:border placeholder-shown:border-blue-gray-200 placeholder-shown:border-t-blue-gray-200 focus:border-2 focus:border-gray-900 focus:border-t-transparent focus:!border-t-gray-900 focus:outline-0 disabled:border-0 disabled:bg-blue-gray-50"
                     name={"imei2"}
                     onChange={handleAddPhoneChange}
+                    maxLength={14}
+                    minLength={14}
                     value={addPhoneForm.imei2}
                   />
                   <label className="before:content[' '] after:content[' '] pointer-events-none absolute left-0 -top-1.5 flex h-full w-full select-none !overflow-visible truncate text-[11px] font-normal leading-tight text-gray-500 transition-all before:pointer-events-none before:mt-[6.5px] before:mr-1 before:box-border before:block before:h-1.5 before:w-2.5 before:rounded-tl-md before:border-t before:border-l before:border-blue-gray-200 before:transition-all before:content-none after:pointer-events-none after:mt-[6.5px] after:ml-1 after:box-border after:block after:h-1.5 after:w-2.5 after:flex-grow after:rounded-tr-md after:border-t after:border-r after:border-blue-gray-200 after:transition-all after:content-none peer-placeholder-shown:text-sm peer-placeholder-shown:leading-[4.1] peer-placeholder-shown:text-blue-gray-500 peer-placeholder-shown:before:border-transparent peer-placeholder-shown:after:border-transparent peer-focus:text-[11px] peer-focus:leading-tight peer-focus:text-gray-900 peer-focus:before:border-t-2 peer-focus:before:border-l-2 peer-focus:before:!border-gray-900 peer-focus:after:border-t-2 peer-focus:after:border-r-2 peer-focus:after:!border-gray-900 peer-disabled:text-transparent peer-disabled:before:border-transparent peer-disabled:after:border-transparent peer-disabled:peer-placeholder-shown:text-blue-gray-500"></label>
